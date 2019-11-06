@@ -1,0 +1,21 @@
+{
+    "name": "meklis/billing-network-helpers",
+    "description": "Libraries for working with help-provider billing using switcher-core",
+    "type": "library",
+    "require": {
+        "meklis/switcher-core": "dev-master"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Max Boyar",
+            "email": "max.boyar.a@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Meklis\\BillingNetworkHelpers\\": "src/"
+        }
+    },
+    "minimum-stability": "dev"
+}
