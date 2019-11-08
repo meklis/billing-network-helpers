@@ -115,8 +115,8 @@ class SearchIP
      */
     private function getFDB($vlan_id, $mac_addr, $ignoreTagged = true) {
         foreach ($this->getSearchDeviceList() as $dev=>$access) {
+            $core = $this->getCoreInstance($dev, $access);
             try {
-                $core = $this->getCoreInstance($dev, $access);
                 $fdb = $core->action('fdb', ['vlan_id' => $vlan_id, 'mac' => $mac_addr]);
                 $vlans = $core->action('vlans', ['vlan_id'=>$vlan_id]);
             } catch (\Exception $e) {
