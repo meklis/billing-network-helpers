@@ -167,7 +167,7 @@ class SearchIP
     private function getCoreInstance($ip, $access) {
         $connector = (new CoreConnector(Helper::getBuildInConfig(), $this->proxySearchPath))
             ->setTelnetPort($access['port_telnet'])->setMikrotikApiPort($access['port_api']);
-        $core = $connector->init($ip, $access['community'], $access['login'], $access['password']);
+        $core = $connector->getOrInit($ip, $access['community'], $access['login'], $access['password']);
         return $core;
     }
 
