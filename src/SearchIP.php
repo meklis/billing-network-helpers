@@ -5,10 +5,8 @@ namespace Meklis\BillingNetworkHelpers;
 
 
 use Meklis\BillingNetworkHelpers\Interfaces\StoreInterface;
-use SnmpWrapper\Walker;
-use SnmpWrapper\WrapperWorker;
-use SwitcherCore\Config\Reader;
 use SwitcherCore\Modules\Helper;
+use SwitcherCore\Switcher\CoreConnector;
 
 class SearchIP
 {
@@ -69,7 +67,10 @@ class SearchIP
         return $response;
     }
 
-
+    /**
+     * @return array
+     * @throws \Exception
+     */
     private function getSearchDeviceList() {
         $devList = $this->store->getSwitchesListByIp($this->ip);
         if(!$devList) {
@@ -78,6 +79,10 @@ class SearchIP
         return $this->getIpListWithAccess($devList);
     }
 
+    /**
+     * @return array
+     * @throws \Exception
+     */
     private function getSearchRouterList() {
         $devList = $this->store->getRouterListByIp($this->ip);
         if(!$devList) {
@@ -86,20 +91,28 @@ class SearchIP
         return $this->getIpListWithAccess($devList);
     }
 
+    /**
+     * @return mixed
+     * @throws \Exception
+     */
     private function getArp() {
         foreach ($this->getSearchRouterList() as $router_ip=>$access) {
-            try {
-                $arp = $this->getCoreInstance($router_ip, $access)->action('arp_info', ['ip' => $this->ip]);
-                if (count($arp) >= 1) {
-                    $arp[0]['router'] = $router_ip;
-                    return $arp[0];
-                }
-            } catch (\Exception $e) {
-                continue;
+            $arp = $this->getCoreInstance($router_ip, $access)->action('arp_info', ['ip' => $this->ip]);
+            if (count($arp) >= 1) {
+                $arp[0]['router'] = $router_ip;
+                return $arp[0];
             }
         }
         throw new \Exception("ARP for ip {$this->ip} not found on L3 devices");
     }
+
+    /**
+     * @param $vlan_id
+     * @param $mac_addr
+     * @param bool $ignoreTagged
+     * @return mixed
+     * @throws \Exception
+     */
     private function getFDB($vlan_id, $mac_addr, $ignoreTagged = true) {
         foreach ($this->getSearchDeviceList() as $dev=>$access) {
             try {
@@ -130,10 +143,6 @@ class SearchIP
         throw new \Exception("MAC $mac_addr in vlan $vlan_id not found on L2 devices");
     }
 
-    private function getProxyConfig($ip) {
-        $proxyConfig = new \SwitcherCore\Config\ProxyConfiguration($this->proxySearchPath);
-        return $proxyConfig->setSearchedIP($ip);
-    }
 
     /**
      * Передать файл к proxies.yml. Пример реализации файла https://github.com/meklis/switcher-core/blob/master/configs/example.proxies.yml
@@ -147,31 +156,18 @@ class SearchIP
         return $this;
     }
 
+    /**
+     * @param $ip
+     * @param $access
+     * @return \SwitcherCore\Switcher\Core
+     * @throws \ErrorException
+     * @throws \SwitcherCore\Exceptions\ModuleErrorLoadException
+     * @throws \SwitcherCore\Exceptions\ModuleNotFoundException
+     */
     private function getCoreInstance($ip, $access) {
-        $walker =  (new  Walker(
-            new  WrapperWorker($this->getProxyConfig($ip)->getSnmpConfiguration()['address']))
-        )->useCache(false)
-            ->setIp($ip)
-            ->setCommunity($access['community']);
-        $core = (new \SwitcherCore\Switcher\Core(
-            new  Reader(Helper::getBuildInConfig())
-        ))->setWalker($walker)->init();
-
-        $inputs_list = $core->getNeedInputs();
-        if(in_array('telnet', $inputs_list)) {
-            $telnet = (new \SwitcherCore\Switcher\Objects\TelnetLazyConnect($ip, $access['port_telnet']))
-                ->connectOverProxy($this->getProxyConfig($ip)->getTelnetConfiguration()['address'])
-                ->login($access['login'], $access['password']);
-            $core->setTelnet($telnet);
-        }
-
-        if(in_array('routeros_api', $inputs_list)) {
-            $routerOS = (new \SwitcherCore\Switcher\Objects\RouterOsLazyConnect())
-                ->setPort($access['port_api'])
-                ->connect($ip, $access['login'], $access['password']);
-            $core->setRouterOsAPI($routerOS);
-        }
-
+        $connector = (new CoreConnector(Helper::getBuildInConfig(), $this->proxySearchPath))
+            ->setTelnetPort($access['port_telnet'])->setMikrotikApiPort($access['port_api']);
+        $core = $connector->init($ip, $access['community'], $access['login'], $access['password']);
         return $core;
     }
 
