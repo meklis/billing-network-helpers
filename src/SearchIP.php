@@ -187,6 +187,9 @@ class SearchIP
      */
     public function search() {
         $arp = $this->getArp();
+        if(!$arp['mac']) {
+            throw new \Exception("Found ARP without MAC-address");
+        }
         $fdb = $this->getFDB($arp['vlan_id'], $arp['mac']);
 
         return [
